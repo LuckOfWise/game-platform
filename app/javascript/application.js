@@ -75,7 +75,6 @@ async function boot(root) {
     const labels = {
       "waiting_for_players": "対戦相手を待っています",
       "dice_roll": "先攻決定（ダイスロール）",
-      "placement": "初期配置",
       "play": "対戦中",
       "finished": "終了"
     }
@@ -90,7 +89,7 @@ async function boot(root) {
     const winner = state.winner
 
     const myTurn = slot && turn === slot
-    const canPlay = slot && (phase === "dice_roll" || phase === "placement" || phase === "play")
+    const canPlay = slot && (phase === "dice_roll" || phase === "play")
 
     root.innerHTML = `
       <div class="game">
@@ -103,7 +102,7 @@ async function boot(root) {
               ${slot ? (myTurn ? "（あなた）" : "") : ""}
             </div></div>
           ` : ""}
-          ${phase === "placement" || phase === "play" || phase === "finished" ? `
+          ${phase === "play" || phase === "finished" ? `
             <div class="kv"><div class="small">スコア</div><div>
               <span class="badge p1">P1: ${s1}</span>
               <span class="badge p2">P2: ${s2}</span>
@@ -127,7 +126,7 @@ async function boot(root) {
             `).join("")).join("")}
           </div>
           <div class="small" style="margin-top:10px;">
-            ルール要点：中央4マスに初期配置、上下左右に1マス移動、最大2個まで押し転がし、11ぴったりで勝ち・相手が12以上になったら勝ち
+            ルール要点：手持ちを中央4マスに置く／ステージのコマを1マス転がす、最大2個押し転がし可、3つ置いて11ぴったりで勝ち・相手が12以上になったら勝ち
           </div>
         </div>
       </div>
@@ -205,23 +204,27 @@ async function boot(root) {
     if (!canPlay) return `<div class="small">操作不可</div>`
     if (!myTurn) return `<div class="small">相手の手番です</div>`
 
-    if (phase === "placement") {
-      const placed = state.placed?.[String(slot)] || []
-      const availableDice = [1, 2, 3].filter(i => !placed.includes(i))
-      const dieOptions = availableDice.map(i => `<option value="${i}">die ${i}</option>`).join("")
-
-      return `
-        <div class="small">初期配置：中央4マスに、自分のダイスを3つ置く</div>
-        <div class="controls">
-          <select data-die class="dirbtn">
-            ${dieOptions}
-          </select>
-          <button class="btn" data-place>選択マスに置く</button>
-        </div>
-      `
-    }
-
     if (phase === "play") {
+      const myHand = state.hand?.[String(slot)] || []
+
+      let placeSection = ""
+      if (myHand.length > 0) {
+        const centerCells = [[1,1],[1,2],[2,1],[2,2]]
+        const centerFull = centerCells.every(([r,c]) => state.board[r][c])
+        if (!centerFull) {
+          const dieOptions = myHand.map(i => `<option value="${i}">die ${i}</option>`).join("")
+          placeSection = `
+            <div class="small" style="margin-top:8px;">中央に置く：</div>
+            <div class="controls">
+              <select data-die class="dirbtn">
+                ${dieOptions}
+              </select>
+              <button class="btn" data-place>選択マスに置く</button>
+            </div>
+          `
+        }
+      }
+
       return `
         <div class="small">移動：自分のコマを選択して方向ボタン</div>
         <div class="controls">
@@ -230,6 +233,7 @@ async function boot(root) {
           <button class="dirbtn" data-dir="S">↓</button>
           <button class="dirbtn" data-dir="E">→</button>
         </div>
+        ${placeSection}
       `
     }
 

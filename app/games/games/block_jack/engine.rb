@@ -18,7 +18,7 @@ module Games
           "players" => {},
           "dice_roll" => {},
           "board" => empty_board,
-          "placed" => { "1" => [], "2" => [] }
+          "hand" => { "1" => [], "2" => [] }
         }
       end
 
@@ -43,10 +43,12 @@ module Games
         when "roll_dice"
           apply_roll_dice(state, actor_slot)
         when "place"
+          ensure_play_phase!(state)
           ensure_turn!(state, actor_slot)
           apply_place(state, actor_slot, action)
           evaluate_and_advance!(state)
         when "move"
+          ensure_play_phase!(state)
           ensure_turn!(state, actor_slot)
           apply_move(state, actor_slot, action)
           evaluate_and_advance!(state)
@@ -69,6 +71,10 @@ module Games
 
       def ensure_not_finished!(state)
         raise "Game finished" if state["phase"] == "finished"
+      end
+
+      def ensure_play_phase!(state)
+        raise "Phase mismatch" unless state["phase"] == "play"
       end
 
       def ensure_turn!(state, actor_slot)
@@ -111,9 +117,11 @@ module Games
         state["dice_roll"]["result"] = "resolved"
         state["dice_roll"]["first_player"] = first_player
         state["turn"] = first_player
-        state["phase"] = "placement"
+        state["phase"] = "play"
         state["players"]["1"] = { "dice" => initial_dice_set }
         state["players"]["2"] = { "dice" => initial_dice_set }
+        state["hand"]["1"] = [ 1, 2, 3 ]
+        state["hand"]["2"] = [ 1, 2, 3 ]
       end
 
       def compare_dice_rolls(roll1, roll2)
@@ -152,19 +160,18 @@ module Games
       end
 
       def apply_place(state, actor_slot, action)
-        raise "Phase mismatch" unless state["phase"] == "placement"
         die_index = action.fetch("die_index").to_i
         r, c = action.fetch("pos")
         r = r.to_i; c = c.to_i
+
+        hand = state["hand"][actor_slot.to_s]
+        raise "No dice in hand" if hand.empty?
+        raise "Die not in hand" unless hand.include?(die_index)
 
         unless CENTER_CELLS.include?([ r, c ])
           raise "Must place on center 4 cells"
         end
         raise "Cell occupied" if state["board"][r][c]
-
-        placed = state["placed"][actor_slot.to_s]
-        raise "Die already placed" if placed.include?(die_index)
-        raise "Invalid die_index" unless (1..3).include?(die_index)
 
         die = state["players"][actor_slot.to_s]["dice"].find { |d| d["index"] == die_index }
         raise "Die not found" unless die
@@ -174,11 +181,7 @@ module Games
           "die_index" => die_index,
           "faces" => die["faces"]
         }
-        placed << die_index
-
-        if state["placed"]["1"].size == 3 && state["placed"]["2"].size == 3
-          state["phase"] = "play"
-        end
+        hand.delete(die_index)
       end
 
       DIRS = {
@@ -189,7 +192,6 @@ module Games
       }.freeze
 
       def apply_move(state, actor_slot, action)
-        raise "Phase mismatch" unless state["phase"] == "play"
         from_r, from_c = action.fetch("from")
         dir = action.fetch("dir").to_s
         dr, dc = DIRS.fetch(dir)
@@ -285,27 +287,29 @@ module Games
         if state["phase"] == "play"
           s1 = score_for(state, 1)
           s2 = score_for(state, 2)
+          count1 = count_on_board(state, 1)
+          count2 = count_on_board(state, 2)
 
-          if s1 == 11
+          if count1 == 3 && s1 == 11
             state["phase"] = "finished"
             state["winner"] = 1
             state["winner_slot"] = 1
             return
           end
-          if s2 == 11
+          if count2 == 3 && s2 == 11
             state["phase"] = "finished"
             state["winner"] = 2
             state["winner_slot"] = 2
             return
           end
 
-          if state["turn"] == 1 && s2 >= 12
+          if state["turn"] == 1 && count2 == 3 && s2 >= 12
             state["phase"] = "finished"
             state["winner"] = 1
             state["winner_slot"] = 1
             return
           end
-          if state["turn"] == 2 && s1 >= 12
+          if state["turn"] == 2 && count1 == 3 && s1 >= 12
             state["phase"] = "finished"
             state["winner"] = 2
             state["winner_slot"] = 2
@@ -328,6 +332,19 @@ module Games
           end
         end
         sum
+      end
+
+      def count_on_board(state, owner)
+        board = state["board"]
+        count = 0
+        BOARD_SIZE.times do |r|
+          BOARD_SIZE.times do |c|
+            cell = board[r][c]
+            next unless cell
+            count += 1 if cell["owner"].to_i == owner
+          end
+        end
+        count
       end
     end
   end

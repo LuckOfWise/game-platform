@@ -22,7 +22,7 @@ module Game
         session.status =
           case new_state["phase"]
           when "waiting_for_players", "dice_roll" then :waiting
-          when "placement", "play" then :playing
+          when "play" then :playing
           when "finished" then :finished
           else :playing
           end
