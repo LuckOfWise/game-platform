@@ -1,0 +1,30 @@
+<div class="container">
+  <h1>BlockJack</h1>
+
+  <div class="row">
+    <div class="card">
+      <div class="label">Room URL</div>
+      <input class="url" value="<%= request.url %>" readonly onclick="this.select()" />
+      <div class="hint">相手にこのURLを送る</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Join</div>
+
+      <% slot = cookies.signed["bj_slot_#{@session.id}"]&.to_i %>
+
+      <% if slot.present? %>
+        <div>あなたは Player <strong><%= slot %></strong></div>
+      <% elsif @session.game_participants.size >= 2 %>
+        <div>満員です（観戦MVPは未対応）</div>
+      <% else %>
+        <%= form_with url: join_session_path(@session), method: :post, local: true do |f| %>
+          <input name="display_name" placeholder="名前（任意）" />
+          <button class="btn" type="submit">参加する</button>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <div id="app" data-session-id="<%= @session.id %>"></div>
+</div>

@@ -1,0 +1,10 @@
+<div class="container">
+  <h1>BlockJack MVP</h1>
+
+  <p>マッチングなし。部屋を作ってURLを共有して遊ぶ。</p>
+
+  <%= form_with url: sessions_path, method: :post, local: true do |f| %>
+    <input name="display_name" placeholder="名前（任意）" />
+    <button class="btn" type="submit">新しい部屋を作る</button>
+  <% end %>
+</div>
